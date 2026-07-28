@@ -143,7 +143,16 @@ def split_rollouts_by_seen_unseen(
     seen_task_ids: list[int],
     unseen_task_ids: list[int],
 ):
-    print(f"Seen tasks: {seen_task_ids}, Unseen tasks: {unseen_task_ids}")
+    # Print seen/unseen split with task names
+    seen_task_names = list(set([r.task_description for r in all_rollouts if r.task_id in seen_task_ids]))
+    unseen_task_names = list(set([r.task_description for r in all_rollouts if r.task_id in unseen_task_ids]))
+
+    print("\n" + "="*80)
+    print("SEEN/UNSEEN TASK SPLIT".center(80))
+    print("="*80)
+    print(f"Seen tasks ({len(seen_task_ids)}): {seen_task_names}")
+    print(f"Unseen tasks ({len(unseen_task_ids)}): {unseen_task_names}")
+    print("="*80 + "\n")
 
     seen_rollouts = [r for r in all_rollouts if r.task_id in seen_task_ids]
     unseen_rollouts = [r for r in all_rollouts if r.task_id in unseen_task_ids]
@@ -170,11 +179,28 @@ def split_rollouts_by_seen_unseen(
         del rollouts_by_split_name["val_unseen"]
     if len(val_seen_rollouts) == 0:
         del rollouts_by_split_name["val_seen"]
-    
+
+    # Print train/val split statistics
+    print("="*80)
+    print("TRAIN/VAL SPLIT".center(80))
+    print("="*80)
     for split, rollouts in rollouts_by_split_name.items():
         n_success = sum([r.episode_success for r in rollouts])
         n_fail = len(rollouts) - n_success
-        print(f"{split}: {len(rollouts)} rollouts, {n_success} success, {n_fail} fail")
+        print(f"{split.upper()}: {len(rollouts)} rollouts ({n_success} success, {n_fail} fail)")
+
+    # Print per-task breakdown for train split only
+    if "train" in rollouts_by_split_name:
+        train_rollouts = rollouts_by_split_name["train"]
+        train_task_names = list(set([r.task_description for r in train_rollouts]))
+        print(f"\nTraining set contains {len(train_task_names)} tasks:")
+        for task_name in sorted(train_task_names):
+            task_rollouts = [r for r in train_rollouts if r.task_description == task_name]
+            n_success = sum([r.episode_success for r in task_rollouts])
+            n_fail = len(task_rollouts) - n_success
+            print(f"  • {task_name}: {len(task_rollouts)} rollouts ({n_success} success, {n_fail} fail)")
+
+    print("="*80 + "\n")
 
     return rollouts_by_split_name
 

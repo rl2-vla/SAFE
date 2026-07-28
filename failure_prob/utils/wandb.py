@@ -1,4 +1,6 @@
 import json
+import os
+import re
 import warnings
 import wandb
 import pandas as pd
@@ -282,7 +284,6 @@ def get_runs_df(
 
 def load_summary_tables_from_runs(
     runs: list[wandb.apis.public.Run],
-    api = wandb.Api(),
 ) -> list[dict]:
     data_runs = []
 
@@ -298,38 +299,36 @@ def load_summary_tables_from_runs(
             **config
         }
         data_run_keys = list(data_run.keys())
-        
-        # Get all artifacts logged in this run
-        for artifact in run.logged_artifacts():
-            if artifact.type != "run_table":
-                continue  # Only process table artifacts
+
+        # Get all table files logged in this run
+        all_files = list(run.files())
+        print(f"Total files in run: {len(all_files)}")
+        for run_file in all_files:
+            print(f"  {run_file.name}")
+            if not run_file.name.endswith(".table.json"):
+                continue
 
             try:
-                # Use qualified name to fetch and download
-                qualified_name = artifact.qualified_name
-                
-                downloaded_artifact = api.artifact(qualified_name)
-                artifact_dir = downloaded_artifact.download()
-                
-                logged_name = artifact.name.split("-")[-1].split(":")[0]
+                # Reconstruct the original table key from the file path.
+                # e.g. "media/table/classify_cp_functional/model_2999_<hash>.table.json"
+                #   -> "classify_cp_functional/model"
+                rel_path = run_file.name.replace("media/table/", "").replace(".table.json", "")
+                dir_part = os.path.dirname(rel_path)
+                base_part = re.sub(r'_\d+_[a-f0-9]+$', '', os.path.basename(rel_path))
+                logged_key = f"{dir_part}/{base_part}" if dir_part else base_part
 
-                # Find the .table.json file path
-                for file in downloaded_artifact.manifest.entries:
-                    if file.endswith(".table.json"):
-                        file_path = f"{artifact_dir}/{file}"
+                # Download and parse the table
+                with run_file.download(replace=True) as f:
+                    table_json = json.load(f)
+                df = pd.DataFrame(table_json['data'], columns=table_json['columns'])
 
-                        # Load the table as DataFrame
-                        table_json = json.load(open(file_path, 'r'))
-                        df = pd.DataFrame(table_json['data'], columns=table_json['columns'])
-                        
-                        # Save the table to the data_run dictionary
-                        for k in data_run_keys:
-                            # remove "." and "/" from k
-                            if k.replace(".", "").replace("/", "") == logged_name or k.replace("/", "") == logged_name:
-                                data_run[k] = df
+                # Match back to the original summary key
+                for k in data_run_keys:
+                    if k == logged_key:
+                        data_run[k] = df
 
             except Exception as e:
-                print(f"Failed to load artifact from run '{name}': {e}")
+                print(f"Failed to load file '{run_file.name}' from run '{name}': {e}")
                 
         # Append the data_run to the list
         data_runs.append(data_run)

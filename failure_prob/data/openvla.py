@@ -82,7 +82,7 @@ def extract_info_from_path(filename):
 
 def load_rollouts(cfg: Config) -> list[Rollout]:
     # Load data
-    all_csv = glob.glob(f"{cfg.dataset.data_path}*.csv")
+    all_csv = glob.glob(f"{cfg.dataset.data_path}/**/*.csv", recursive=True)
     all_rollouts = []
     
     for csv_path in tqdm(all_csv, desc="Loading rollouts"):

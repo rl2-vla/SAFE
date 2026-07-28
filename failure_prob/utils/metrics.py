@@ -498,6 +498,7 @@ def eval_functional_conformal(
     if alphas is None:
         # alphas = [0.02] + [0.05 * i for i in range(1, 10)] + [0.5, 0.6, 0.7, 0.8, 0.9]
         alphas = [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9]
+
     classification_logs = []
     
     cal_rollouts, cal_scores_all = [], []
@@ -527,6 +528,20 @@ def eval_functional_conformal(
     else:
         raise ValueError(f"Unknown align_method: {align_method}")
     
+    print("="*80)
+    print("CONFORMAL PREDICTION CALIBRATION".center(80))
+    print("="*80)
+    print(f"Calibration split: {calib_split_names[0]}")
+    print(f"Test split: {test_split_names[0]}")
+
+    n_cal_success = sum([r.episode_success for r in cal_rollouts])
+    n_cal_fail = len(cal_rollouts) - n_cal_success
+    cal_task_names = sorted(list(set([r.task_description for r in cal_rollouts])))
+
+    print(f"\nCalibration data: {len(cal_rollouts)} rollouts from {len(cal_task_names)} tasks")
+    print(f"  • Success: {n_cal_success}, Fail: {n_cal_fail}")
+    print(f"  • Tasks: {cal_task_names}")
+
     for calib_on in ['neg']:
         if calib_on == "neg": # Calibration on the successful rollouts
             lower_bound = False
@@ -535,7 +550,10 @@ def eval_functional_conformal(
             lower_bound = True
             cal_scores_used = [s for s, r in zip(cal_scores_all, cal_rollouts) if r.episode_success == 0]
             raise NotImplementedError("Functional CP calibrated on failures does not make sense. .")
-        
+
+        print(f"\nUsing {len(cal_scores_used)} successful trajectories for CP band computation")
+        print("="*80 + "\n")
+
         # Split the cal scores evenly randomly into two set (for regression and modulation respectively)
         cal_scores_used = np.array(cal_scores_used)
         if len(cal_scores_used) == 1:

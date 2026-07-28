@@ -422,6 +422,16 @@ def eval_save_videos_functional_cp(
     # Retrieve the CP band for the given alpha.
     cp_band = cp_bands_by_alpha[alpha][0]  # Shape: (T,)
     
+    print("===========================================================================")
+    print("--------------------------------- CP Band ---------------------------------")
+    print("===========================================================================")
+    print(cp_band.shape)
+    print(cp_band)
+    print("===========================================================================")
+
+    if cfg.train.skip_video_gen_during_eval:
+        return cp_bands_by_alpha, df  # Skip video generation
+
     # Gather test rollouts and their corresponding scores.
     test_rollouts = sum([rollouts_by_split_name[k] for k in test_split_names], [])
     test_scores = sum([scores_by_split_name[k] for k in test_split_names], [])
@@ -462,4 +472,4 @@ def eval_save_videos_functional_cp(
             # TODO: This is for debugging. Remove it later.
             break
     
-    return df  # Return the dataframe if needed for further analysis.
+    return cp_bands_by_alpha, df  # Return the dataframe if needed for further analysis.

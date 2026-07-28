@@ -1,4 +1,5 @@
-# Automatic the processing of metrics from wandb
+# Processing metrics from wandb
+# Note: Adjust --top_n to display top N runs
 import argparse
 import os
 import pandas as pd
@@ -10,184 +11,186 @@ from failure_prob.utils.wandb import (
 )
 
 # initialize the API
-WANDB_USERNAME = wandb.Api().viewer.username
+WANDB_ENTITY = wandb.Api().default_entity
+WANBD_PROJECT_NAME = f"{WANDB_ENTITY}/rl2-vla-safe-sweep"
+# WANDB_USERNAME = wandb.Api().viewer.username
+# WANBD_PROJECT_NAME = f"{WANDB_USERNAME}/rl2-vla-safe-per-task-optimal"
 
-WANBD_PROJECT_NAME = f"{WANDB_USERNAME}/vla-safe"
 
 
 WANDB_META_V2 = {
-    "pi0fast_libero_v4": [
-        # Pi0-FAST on the LIBERO benchmark
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0fast_libero_v4"],
-            "exp_suffixes": ["lstm", "mlp"],
-            "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.lr", "model.lambda_reg"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0fast_libero_v4"],
-            "exp_suffixes": ["embed"],
-            "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0fast_libero_v4"],
-            "exp_suffixes": ["chen"],
-            "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.use_success_only"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0fast_libero_v4"],
-            "exp_suffixes": ["handcrafted"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0fast_libero_v4"],
-            "exp_suffixes": ["handcrafted_multi"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-    ],
-    "openvla_libero_v2": [
-        # OpenVLA on the LIBERO benchmark
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["openvla_libero_v2"],
-            "exp_suffixes": ["lstm", "mlp"],
-            "ablated_configs": ["model.name", "dataset.token_idx_rel", "model.lr", "model.lambda_reg"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["openvla_libero_v2"],
-            "exp_suffixes": ["embed"],
-            "ablated_configs": ["model.name", "dataset.token_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["openvla_libero_v2"],
-            "exp_suffixes": ["chen"],
-            "ablated_configs": ["model.name", "dataset.token_idx_rel"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["openvla_libero_v2"],
-            "exp_suffixes": ["handcrafted"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["openvla_libero_v2"],
-            "exp_suffixes": ["handcrafted_multi"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-    ],
-    "pi0diff_libero_v1": [
-        # Pi0 (diffusion version) on LIBERO
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0diff_libero_v1"],
-            "exp_suffixes": ["lstm", "mlp"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.lr", "model.lambda_reg"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0diff_libero_v1"],
-            "exp_suffixes": ["embed"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0diff_libero_v1"],
-            "exp_suffixes": ["chen"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel"],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0diff_libero_v1"],
-            "exp_suffixes": ["handcrafted"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["pi0diff_libero_v1"],
-            "exp_suffixes": ["handcrafted_multi"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed"],
-            "extra_filters": {},
-        },
-    ],
     "opi0_simpler_v1": [
         # open-pi-zero on SimplerEnv
         {
             "project_name": WANBD_PROJECT_NAME,
             "group_names": ["opi0_simpler_v1"],
-            "exp_suffixes": ["lstm", "mlp"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.lr", "model.lambda_reg"],
-            "group_configs": ["train.seed", "dataset.subset_name"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["opi0_simpler_v1"],
-            "exp_suffixes": ["embed"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
-            "group_configs": ["train.seed", "dataset.subset_name"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["opi0_simpler_v1"],
-            "exp_suffixes": ["chen"],
-            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel"],
-            "group_configs": ["train.seed", "dataset.subset_name"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["opi0_simpler_v1"],
-            "exp_suffixes": ["handcrafted"],
-            "ablated_configs": [],
-            "group_configs": ["train.seed", "dataset.subset_name"],
-            "extra_filters": {},
-        },
-        {
-            "project_name": WANBD_PROJECT_NAME,
-            "group_names": ["opi0_simpler_v1"],
-            "exp_suffixes": ["handcrafted_multi"],
-            "ablated_configs": [],
+            "exp_suffixes": ["lstm"],
+            "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.lr", "model.lambda_reg", "model.n_epochs"],
             "group_configs": ["train.seed", "dataset.subset_name"],
             "extra_filters": {},
         },
     ],
+    # # Pi0-FAST on the LIBERO benchmark
+    # "pi0fast_libero_v4": [
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0fast_libero_v4"],
+    #         "exp_suffixes": ["lstm", "mlp"],
+    #         "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.lr", "model.lambda_reg"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0fast_libero_v4"],
+    #         "exp_suffixes": ["embed"],
+    #         "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0fast_libero_v4"],
+    #         "exp_suffixes": ["chen"],
+    #         "ablated_configs": ["model.name", "dataset.feat_name", "dataset.token_idx_rel", "model.use_success_only"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0fast_libero_v4"],
+    #         "exp_suffixes": ["handcrafted"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0fast_libero_v4"],
+    #         "exp_suffixes": ["handcrafted_multi"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    # ],
+    # "openvla_libero_v2": [
+    #     # OpenVLA on the LIBERO benchmark
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["openvla_libero_v2"],
+    #         "exp_suffixes": ["lstm", "mlp"],
+    #         "ablated_configs": ["model.name", "dataset.token_idx_rel", "model.lr", "model.lambda_reg"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["openvla_libero_v2"],
+    #         "exp_suffixes": ["embed"],
+    #         "ablated_configs": ["model.name", "dataset.token_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["openvla_libero_v2"],
+    #         "exp_suffixes": ["chen"],
+    #         "ablated_configs": ["model.name", "dataset.token_idx_rel"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["openvla_libero_v2"],
+    #         "exp_suffixes": ["handcrafted"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["openvla_libero_v2"],
+    #         "exp_suffixes": ["handcrafted_multi"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    # ],
+    # "pi0diff_libero_v1": [
+    #     # Pi0 (diffusion version) on LIBERO
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0diff_libero_v1"],
+    #         "exp_suffixes": ["lstm", "mlp"],
+    #         "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.lr", "model.lambda_reg"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0diff_libero_v1"],
+    #         "exp_suffixes": ["embed"],
+    #         "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0diff_libero_v1"],
+    #         "exp_suffixes": ["chen"],
+    #         "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel"],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0diff_libero_v1"],
+    #         "exp_suffixes": ["handcrafted"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["pi0diff_libero_v1"],
+    #         "exp_suffixes": ["handcrafted_multi"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["opi0_simpler_v1"],
+    #         "exp_suffixes": ["embed"],
+    #         "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel", "model.distance", "model.topk", "model.cumsum", "model.pca_dim", "model.n_clusters"],
+    #         "group_configs": ["train.seed", "dataset.subset_name"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["opi0_simpler_v1"],
+    #         "exp_suffixes": ["chen"],
+    #         "ablated_configs": ["model.name", "dataset.horizon_idx_rel", "dataset.diff_idx_rel"],
+    #         "group_configs": ["train.seed", "dataset.subset_name"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["opi0_simpler_v1"],
+    #         "exp_suffixes": ["handcrafted"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed", "dataset.subset_name"],
+    #         "extra_filters": {},
+    #     },
+    #     {
+    #         "project_name": WANBD_PROJECT_NAME,
+    #         "group_names": ["opi0_simpler_v1"],
+    #         "exp_suffixes": ["handcrafted_multi"],
+    #         "ablated_configs": [],
+    #         "group_configs": ["train.seed", "dataset.subset_name"],
+    #         "extra_filters": {},
+    #     },
+    # ],
 }
 
 
@@ -340,8 +343,12 @@ def main(args: argparse.Namespace):
                         
             # Get the best run for each combination of method and model.name
             compare_df = compare_df[compare_df["metric"] == METRIC]
-            idx = compare_df.groupby(['model.name', 'method'])['val_seen'].idxmax()
-            df_max = compare_df.loc[idx].reset_index(drop=True)
+            compare_df["val_seen"] = pd.to_numeric(compare_df["val_seen"], errors="coerce")
+            df_max = (
+                compare_df.groupby(['model.name', 'method'], group_keys=False)
+                .apply(lambda g: g.nlargest(args.top_n, 'val_seen'))
+                .reset_index(drop=True)
+            )
             benchmark_best.append(df_max)
         
         # Concatenate all the best runs
@@ -354,14 +361,14 @@ def main(args: argparse.Namespace):
         cols.insert(1, cols.pop(cols.index('model.name')))
         cols.insert(2, cols.pop(cols.index('train')))
         cols.insert(3, cols.pop(cols.index('val_seen')))
-        cols.insert(4, cols.pop(cols.index('val_unseen')))
+        # cols.insert(4, cols.pop(cols.index('val_unseen')))
         benchmark_best = benchmark_best[cols]
         
         # Sort the dataframe by model.name, according to the order in MODEL_NAME_ORDER
         benchmark_best['model.name'] = pd.Categorical(
             benchmark_best['model.name'], categories=MODEL_NAME_ORDER, ordered=True
         )
-        benchmark_best = benchmark_best.sort_values(by=['model.name'])
+        benchmark_best = benchmark_best.sort_values(by=['model.name', 'val_seen'], ascending=[True, False])
         
         # print(benchmark_best)
         
@@ -381,5 +388,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--meta", type=str, default="v2", help="The meta version to use")
     parser.add_argument("--benchmark", type=str, default="all", help="The benchmark to process")
+    parser.add_argument("--top-n", type=int, default=1, help="Number of top hyperparameter configurations to output per (model, method) group")
     args = parser.parse_args()
     main(args)

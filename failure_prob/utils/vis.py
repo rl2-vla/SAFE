@@ -54,6 +54,11 @@ def plot_scores_by_splits(
 ):
     n_axes = len(scores_by_split_name)
     fig, axes = plt.subplots(1, n_axes, figsize=(6*n_axes, 6))
+
+    # Handle case where there's only one subplot (axes is not an array)
+    if n_axes == 1:
+        axes = [axes]
+
     for i, (split_name, scores) in enumerate(scores_by_split_name.items()):
         ax = axes[i]
         rollouts = rollouts_by_split_name[split_name]

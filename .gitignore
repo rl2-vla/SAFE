@@ -156,8 +156,11 @@ wandb/
 flash_attn_cache
 slurm_logs
 /outputs
-/multirun
+*multirun
 /results
-/logs
+*logs
 /artifacts
 /setup_envs.bash
+*notebooks
+*media
+*csv

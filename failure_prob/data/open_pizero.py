@@ -75,7 +75,7 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
     assert os.path.isdir(load_root), f"Path {load_root} is not a directory"
     
     all_task_names = os.listdir(load_root)
-    
+
     keep_tasks = [
         "widowx_carrot_on_plate",
         "widowx_put_eggplant_in_basket",
@@ -86,16 +86,21 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
         "google_robot_close_drawer",
         "google_robot_place_apple_in_closed_top_drawer",
     ]
-    
-    task_names = [t for t in keep_tasks if t in all_task_names]
+
+    # Match task names with any postfix (e.g., widowx_put_eggplant_in_basket_seed0)
+    task_names = []
+    for keep_task in keep_tasks:
+        matching_tasks = [t for t in all_task_names if t.startswith(keep_task)]
+        task_names.extend(matching_tasks)
     
     print(f"Keeping {len(task_names)} tasks: {task_names}")
     
     all_rollouts = []
-    
+
     for task_id, task_name in enumerate(task_names):
         task_folder = os.path.join(load_root, task_name)
-        meta_info_paths = glob.glob(f"{task_folder}/*_meta.json")
+        # Recursively search for all meta.json files under this task folder
+        meta_info_paths = glob.glob(f"{task_folder}/**/*_meta.json", recursive=True)
         for meta_info_path in tqdm(meta_info_paths):
             pkl_path = meta_info_path.replace("_meta.json", ".pkl")
             mp4_path = meta_info_path.replace("_meta.json", ".mp4")
@@ -117,7 +122,11 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
                 # A: dimensions of action space
                 # E: dimensions of action embedding
                 action_embeds = r[cfg.dataset.feat_name] # (N, T, H, E)
-                
+
+                # NOTE: INTACT-pi0 has a redundant first dim in the action embedding
+                if action_embeds.shape[2] == r['sampled_actions'].shape[1] + 1:
+                    action_embeds = action_embeds[:, :, 1:, :]
+
                 # handle the horizon dimension
                 # (N, T, H, E) -> (N, T, E)
                 action_embeds = process_tensor_idx_rel(action_embeds, cfg.dataset.horizon_idx_rel)
@@ -126,8 +135,8 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
                 # (N, T, E) -> (N, E)
                 action_embeds = process_tensor_idx_rel(action_embeds, cfg.dataset.diff_idx_rel)
                 
-                # Only keep embeddings from the last sampled action (used for the actual execution)
-                embed = action_embeds[-1].reshape(-1) 
+                # Only keep embeddings from the first sampled action (used for the actual execution)
+                embed = action_embeds[0].reshape(-1)
                 
                 hidden_states.append(embed)
                 

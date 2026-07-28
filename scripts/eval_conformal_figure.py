@@ -1,4 +1,7 @@
+# Generates CP plots & alpha selection heuristic json
+
 import argparse
+import re
 import itertools
 import logging
 import os, math
@@ -11,6 +14,7 @@ import json, csv
 from pprint import pprint
 
 import numpy as np
+from adjustText import adjust_text
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import seaborn as sns
@@ -50,10 +54,11 @@ SEED_2_UNSEEN_TASK_IDS_SIMPLER = {
 
 
 CSV_PATHS_V2 = [
-    "notebooks/wandb_metrics_batch_v2/openvla_libero_v2.csv",
-    "notebooks/wandb_metrics_batch_v2/opi0_simpler_v1.csv",
-    "notebooks/wandb_metrics_batch_v2/pi0fast_libero_v4.csv",
-    "notebooks/wandb_metrics_batch_v2/pi0diff_libero_v1.csv",
+    "scripts/wandb_metrics_batch_v2/opi0_simpler_v1.csv",
+    # "scripts/wandb_metrics_batch_v2/openvla_libero_v2.csv",
+    # "scripts/wandb_metrics_batch_v2/pi0_libero.csv",
+    # "scripts/wandb_metrics_batch_v2/openvla_simpler_v2.csv", 
+    # "scripts/wandb_metrics_batch_v2/pi0diff_libero_v1.csv",
 ]
 
 CSV_PATHS = {
@@ -76,7 +81,8 @@ def read_aggregated_training_results_v1(
         })
     elif "simpler" in os.path.basename(csv_path):
         df_new = []
-        for subset in ["bridge", "fractal"]:
+        # for subset in ["bridge", "fractal"]:
+        for subset in ["bridge"]:
             df_best_subset = df_best.copy()
             df_best_subset["subset"] = subset
             df_best_subset = df_best_subset.rename(columns={
@@ -99,7 +105,8 @@ def read_aggregated_training_results_v2(
     
     subsets = ['default']
     if "simpler" in os.path.basename(csv_path):
-        subsets = ['bridge', 'fractal']
+        # subsets = ['bridge', 'fractal']
+        subsets = ['bridge']
         
     n_seeds = 3
     if "droid" in os.path.basename(csv_path):
@@ -214,6 +221,102 @@ def plot_legend(
     return fig_leg
 
 
+def plot_metrics_on_ax(
+    ax: plt.Axes,
+    df: pd.DataFrame,
+    method_to_color: dict,
+    title: str,
+    x_name: str,
+    y_name: str,
+):
+    for method_name in list(METHOD_NAME_2_DISPLAY_NAME.keys()):
+        if method_name not in df['method_name'].unique():
+            continue
+        df_method = df[df['method_name'] == method_name]
+        x = df_method[x_name].values
+        y = df_method[y_name].values
+        sorted_indices = np.argsort(x)
+        x, y = x[sorted_indices], y[sorted_indices]
+        x = np.concatenate(([0], x, [1]))
+        if y_name == "bal_acc":
+            y = np.concatenate(([0.5], y, [0.5]))
+        else:
+            y = np.concatenate(([1], y, [0])) if y[0] > y[-1] else np.concatenate(([0], y, [1]))
+        kwargs = dict(
+            linewidth=0.75, markersize=3, alpha=0.6,
+            marker=METHOD_NAME_2_MARKER.get(method_name, 'o'),
+            label=METHOD_NAME_2_DISPLAY_NAME.get(method_name, method_name),
+            color=method_to_color.get(method_name, 'black'),
+        )
+        if method_name in ['lstm', 'indep']:
+            kwargs.update(linewidth=1.5, alpha=0.8, markersize=5)
+        ax.plot(x, y, **kwargs)
+    ax.set_xlabel(METRIC_KEY_TO_DISPLAY_NAME.get(x_name, x_name), fontsize=8)
+    ax.set_ylabel(METRIC_KEY_TO_DISPLAY_NAME.get(y_name, y_name), fontsize=8)
+    ax.set_title(title, fontsize=8)
+
+
+def _to_pretty_json(obj, indent: int = 4, level: int = 0) -> str:
+    """Like json.dumps(indent=4), but keeps innermost lists on a single line."""
+    if isinstance(obj, dict):
+        if not obj:
+            return "{}"
+        pad_inner = " " * (indent * (level + 1))
+        pad_outer = " " * (indent * level)
+        items = [f'{pad_inner}{json.dumps(k)}: {_to_pretty_json(v, indent, level + 1)}' for k, v in obj.items()]
+        return "{\n" + ",\n".join(items) + "\n" + pad_outer + "}"
+    return json.dumps(obj)
+
+
+def save_topk_bal_acc_alphas(
+    df: pd.DataFrame,
+    method_name: str,
+    topk_k: int,
+    save_path: str,
+):
+    """For each task/seed, sort alphas by bal_acc descending and keep the top-k (ties beyond k included)."""
+    if 'bal_acc' not in df.columns or method_name not in df['method_name'].unique():
+        print(f"Method '{method_name}' not found in data (or bal_acc missing); skipping top-k JSON: {save_path}")
+        return
+
+    df_method = df[df['method_name'] == method_name]
+    all_task_names = sorted(df_method['task'].unique())
+    seed_re = re.compile(r'(?:^|_)seed(\d+)$')
+    task_seed_map = {t: (m.group(1) if (m := seed_re.search(t)) else None) for t in all_task_names}
+
+    topk_alpha = {}
+    topk_bal_acc = {}
+    for task_name in all_task_names:
+        seed_str = task_seed_map[task_name]
+        base_task_name = task_name[: -len(f"_seed{seed_str}")] if seed_str is not None else task_name
+        if base_task_name == "":
+            base_task_name = "combined"
+        elif base_task_name.startswith("widowx_"): # rename
+            base_task_name = "simpler_" + base_task_name[len("widowx_"):]
+        seed_key = seed_str if seed_str is not None else "0"
+
+        df_task = df_method[df_method['task'] == task_name]
+        if df_task.empty:
+            continue
+
+        alphas = df_task['alpha'].tolist()
+        scores = df_task['bal_acc'].tolist()
+        # Rank by bal_acc descending (alpha ascending as tiebreak for stable ordering)
+        order = sorted(range(len(alphas)), key=lambda i: (-round(scores[i], 6), alphas[i]))
+        n_keep = min(topk_k, len(order))
+        threshold = round(scores[order[n_keep - 1]], 6)
+        selected = [i for i in order if round(scores[i], 6) >= threshold]
+
+        topk_alpha.setdefault(base_task_name, {})[seed_key] = [alphas[i] for i in selected]
+        topk_bal_acc.setdefault(base_task_name, {})[seed_key] = [round(scores[i] * 100, 2) for i in selected]
+
+    topk_json = {"alpha": topk_alpha, "bal_acc": topk_bal_acc}
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, "w") as f:
+        f.write(_to_pretty_json(topk_json))
+    logging.info(f"Saved to {save_path}")
+
+
 def get_avg_fail_time(
     exp_name: str,
     seed: int,
@@ -300,7 +403,8 @@ def main(args: argparse.Namespace):
         print(f"Working on {exp_name}")
 
         # Compute the ground truth average fail time
-        gt_avg_fail_time = get_avg_fail_time(exp_name, args.use_seed)
+        # gt_avg_fail_time = get_avg_fail_time(exp_name, args.use_seed)
+        gt_avg_fail_time = 0.5  # Unused
         
         df_best = read_aggregated_training_results(csv_path)
         df_best = df_best[df_best['seed'] == args.use_seed]
@@ -319,185 +423,326 @@ def main(args: argparse.Namespace):
             loaded_data[run_path] = load_summary_tables_from_runs([run])[0]
             
         
-        dfs_cp = []
-        for i, row in df_best.iterrows():
-            run_path = f"{row['_entity']}/{row['_project']}/{row['_id']}"
-            original_method_name = row['method_full'] # the original text in the wandb logs
-            method_name = row['model.name'] # The renamed method name for the paper
+        if args.per_task_or_seed:
+            dfs_cp_per_task = []
+            for i, row in df_best.iterrows():
+                run_path = f"{row['_entity']}/{row['_project']}/{row['_id']}"
+                method_name = row['model.name']
+                data_run = loaded_data[run_path]
+                for key, df_run in data_run.items():
+                    if key.startswith("classify_cp_functional_per_task/"):
+                        df_t = df_run.copy()
+                        df_t['method_name'] = method_name
+                        dfs_cp_per_task.append(df_t)
 
-            if isinstance(original_method_name, float) and math.isnan(original_method_name):
-                original_method_name = "model"
-            
-            data_run = loaded_data[run_path]
-            
-            for eval_protocol in ['classify_cp_functional', 'classify_cp_maxsofar']:
-                key = f"{eval_protocol}/{original_method_name}"
-                if key not in data_run:
-                    print(f"Key {key} not found in run {run_path}")
-                    continue
-                df = data_run[key].copy()
-                df['method_name'] = method_name
-                df['method_name_full'] = original_method_name
-                df['eval_protocol'] = eval_protocol
-                df['subset'] = row['subset']
-                dfs_cp.append(df)
+            if not dfs_cp_per_task:
+                print("No per-task CP tables found in W&B. Ensure training ran with combine_cp_band=False and per-task tables were logged.")
+                continue
 
-        df_cp = pd.concat(dfs_cp, ignore_index=True)
+            df_pt = pd.concat(dfs_cp_per_task, ignore_index=True)
+            df_pt = df_pt[df_pt['time'] == 'by final end']
+            if args.alphas:
+                df_pt = df_pt[df_pt['alpha'].isin(args.alphas)]
 
-        if exp_name == "pi0_libero_v3":
-            df_cp['calib on'] = df_cp['calib on'].fillna("neg")
+            pt_group_cols = [
+                'detect_method', 'cal split', 'test split', 'calib on', 'task',
+                'thresh_method', 'alpha', 'time', 'method_name',
+            ]
+            pt_mean_cols = [c for c in ['tpr', 'tnr', 'fpr', 'fnr', 'acc', 'bal_acc', 'f1', 'avg_det_time'] if c in df_pt.columns]
+            df_pt = df_pt.groupby(pt_group_cols)[pt_mean_cols].mean().reset_index()
 
-        group_by_cols = [
-            'detect_method', 'cal split', 'test split', 'calib on', 'task',
-            'thresh_method', 'alpha', 'time', 'method_name', 'method_name_full','eval_protocol', 
-        ]
-        mean_value_cols = [
-            'tpr', 'tnr', 'fpr', 'fnr', 'acc', 'bal_acc', 'f1', 'weighted-acc',
-            'roc_auc', 'prc_auc', 'threshold', 'avg_det_time', 
-        ]
-        df_cp = df_cp.groupby(group_by_cols)[mean_value_cols].agg(['mean']).reset_index()
-        df_cp.columns = df_cp.columns.droplevel(1)
+            method_to_color = get_method_colors(METHOD_NAME_2_GROUP_ID)
 
-        print(f"Loaded {len(df_cp)} rows from {len(dfs_cp)} runs")
-        
-        # Check the values for the following keys
-        keys = [
-            'cal split',
-            'test split',
-            'calib on',
-            'task',
-            'thresh_method',
-            'time',
-            'method_name',
-            "subset",
-        ]
+            all_task_names = sorted(df_pt['task'].unique())
 
-        for k in keys:
-            if k in df_cp.columns:
-                for v in df_cp[k].unique():
-                    n = len(df_cp[df_cp[k] == v])
-                    # print(f"{k}: {v} -> {n}")
-                    logging.debug(f"{k}: {v} -> {n}")
-                    
-        # Filter the metrics based on argument
-        df = df_cp.copy()
-        if args.eval_proto == "functional":
-            df = df[df['time'] == 'by final end']
-            df = df[df['calib on'] == 'neg']
-            df = df[df['thresh_method'] == 'functional CP']
-        elif args.eval_proto == "max_neg":
-            df = df[df['time'] == 'by final end']
-            df = df[df['calib on'] == 'neg']
-            df = df[df['thresh_method'] == 'split CP, cal on val_seen']
-        elif args.eval_proto == "max_pos":
-            df = df[df['time'] == 'by final end']
-            df = df[df['calib on'] == 'pos']
-            df = df[df['thresh_method'] == 'split CP, cal on val_seen']
+            # Group task names by seed suffix (e.g. 'widowx_carrot_on_plate_seed0' -> '0').
+            # Falls back to single group '' when no suffix (combine_seed_cp_band=True).
+            _pt_seed_re = re.compile(r'(?:^|_)seed(\d+)$')
+            task_seed_map = {t: (m.group(1) if (m := _pt_seed_re.search(t)) else None) for t in all_task_names}
+            unique_seeds = sorted(set(v for v in task_seed_map.values() if v is not None))
+            seed_groups = (
+                {s: [t for t, sv in task_seed_map.items() if sv == s] for s in unique_seeds}
+                if unique_seeds else {'': all_task_names}
+            )
+
+            # Tasks logged as bare "seed{N}" mean tasks were pooled per collection-seed
+            # (train.py combine_cp_band=True, combine_seed_cp_band=False); anything else
+            # (e.g. "widowx_carrot_on_plate_seed0" or plain task names) is genuine per-task data.
+            _bare_seed_re = re.compile(r'^seed\d+$')
+            is_pooled_per_seed = bool(all_task_names) and all(_bare_seed_re.fullmatch(t) for t in all_task_names)
+            cp_group_label = "combined" if is_pooled_per_seed else "per_task"
+
+            # Seed embedded in filename, not folder (train.py appends _seed{X} when combine_seed_cp_band=False)
+            save_folder = f"notebooks/figures/{args.version}/{args.eval_proto}_{cp_group_label}_cp/"
+            print(f"Plots will be saved to: {os.path.abspath(save_folder)}")
+
+            subplot_size = 4  # inches per subplot
+
+            # Save top-k alphas (sorted by bal_acc, descending, ties included) per task/seed
+            save_topk_bal_acc_alphas(
+                df_pt, "lstm", args.topk_k,
+                f"{save_folder}/rl2_cp_alphas_{cp_group_label}.json",
+            )
+
+            for seed_str, task_names in seed_groups.items():
+                seed_suffix = f"_seed{seed_str}" if seed_str else ""
+                n_tasks = len(task_names)
+                ncols = min(n_tasks, 2)
+                nrows = math.ceil(n_tasks / ncols)
+
+                # Plot and save Bal Acc vs. Avg Det Time subplots
+                fig, axes = plt.subplots(nrows, ncols, figsize=(subplot_size * ncols, subplot_size * nrows), dpi=300, squeeze=False)
+                axes_flat = axes.flatten()
+                for i, task_name in enumerate(task_names):
+                    df_t = df_pt[df_pt['task'] == task_name]
+                    plot_metrics_on_ax(axes_flat[i], df_t, method_to_color, task_name, x_name="avg_det_time", y_name="bal_acc")
+                    # Annotate each dot with its alpha value, using adjustText to avoid overlaps
+                    _texts = []
+                    for method_name in df_t['method_name'].unique():
+                        df_m = df_t[df_t['method_name'] == method_name].sort_values('avg_det_time')
+                        color = method_to_color.get(method_name, 'black')
+                        for _, row in df_m.iterrows():
+                            t = axes_flat[i].text(row['avg_det_time'], row['bal_acc'], f"{row['alpha']:.2f}",
+                                                  fontsize=5, color=color, alpha=0.8)
+                            _texts.append(t)
+                    adjust_text(_texts, ax=axes_flat[i], arrowprops=dict(arrowstyle='->', color='gray', lw=0.8))
+                    axes_flat[i].axvline(x=gt_avg_fail_time, color='blue', linestyle='--', linewidth=0.8)
+                    axes_flat[i].set_xlim(0, 0.7)
+                    axes_flat[i].set_ylim(bottom=0.45)
+                for j in range(n_tasks, len(axes_flat)):
+                    axes_flat[j].set_visible(False)
+                plt.tight_layout()
+                save_path = f"{save_folder}/{exp_name}-per_task-balacc_tdet{seed_suffix}.pdf"
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                plt.savefig(save_path, bbox_inches='tight')
+                logging.info(f"Saved to {save_path}")
+                plt.close(fig)
+
+                # Plot and save per-metric vs alpha subplots
+                for metric_key in ['fpr', 'fnr', 'tpr', 'tnr', 'bal_acc']:
+                    if metric_key not in df_pt.columns:
+                        continue
+                    fig, axes = plt.subplots(nrows, ncols, figsize=(subplot_size * ncols, subplot_size * nrows), dpi=300, squeeze=False)
+                    axes_flat = axes.flatten()
+                    for i, task_name in enumerate(task_names):
+                        df_t = df_pt[df_pt['task'] == task_name]
+                        plot_metrics_on_ax(axes_flat[i], df_t, method_to_color, task_name, x_name="alpha", y_name=metric_key)
+                        ax = axes_flat[i]
+                        if metric_key == 'bal_acc':
+                            _texts = []
+                            for method_name in df_t['method_name'].unique():
+                                df_m = df_t[df_t['method_name'] == method_name].sort_values('alpha')
+                                color = method_to_color.get(method_name, 'black')
+                                for _, row in df_m.iterrows():
+                                    t = ax.text(row['alpha'], row['bal_acc'], f"{row['bal_acc']*100:.1f}",
+                                                fontsize=5, color=color, alpha=0.8)
+                                    _texts.append(t)
+                            adjust_text(_texts, ax=ax, arrowprops=dict(arrowstyle='->', color='gray', lw=0.8))
+                        if metric_key == 'tnr':
+                            ax.plot([0, 1], [1, 0], color='gray', linestyle='--', linewidth=0.8)
+                        elif metric_key == 'fpr':
+                            ax.plot([0, 1], [0, 1], color='gray', linestyle='--', linewidth=0.8)
+                        ax.set_xlim(0, 0.5)
+                    for j in range(n_tasks, len(axes_flat)):
+                        axes_flat[j].set_visible(False)
+                    plt.tight_layout()
+                    save_path = f"{save_folder}/{exp_name}-per_task-{metric_key}{seed_suffix}.pdf"
+                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                    plt.savefig(save_path, bbox_inches='tight')
+                    logging.info(f"Saved to {save_path}")
+                    plt.close(fig)
+
         else:
-            raise ValueError(f"Unknown eval_proto: {args.eval_proto}")
+            dfs_cp = []
+            for i, row in df_best.iterrows():
+                run_path = f"{row['_entity']}/{row['_project']}/{row['_id']}"
+                # original_method_name = row['method_full'] # the original text in the wandb logs
+                original_method_name = row['method'] # the original text in the wandb logs
+                method_name = row['model.name'] # The renamed method name for the paper
 
-        print(f"number of rows: {len(df)}")
+                if isinstance(original_method_name, float) and math.isnan(original_method_name):
+                    original_method_name = "model"
 
-        method_to_color = get_method_colors(METHOD_NAME_2_GROUP_ID)
-        
-        
-        # Plot and save the Bal Acc vs. Avg Det Time
-        fig, ax = plot_metrics(
-            df,
-            method_to_color,
-            exp_name,
-            x_name="avg_det_time",
-            y_name="bal_acc",
-        )
+                data_run = loaded_data[run_path]
 
-        # Plot a vertical line at gt_avg_fail_time
-        plt.axvline(x=gt_avg_fail_time, color='blue', linestyle='--', label="GT Avg Fail Time")
-        
-        plt.xlim(0, 0.7)
-        ax.set_ylim(bottom=0.45)
-        
-        save_folder = f"notebooks/figures/{args.version}/{args.eval_proto}-seed{args.use_seed}/"
-        
-        save_path = f"{save_folder}/{exp_name}-balacc_tdet.pdf"
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, bbox_inches='tight')
-        logging.info(f"Saved to {save_path}")
-        
-        # Plot and save the legend figure
-        fig_leg = plot_legend(ax)
-        
-        save_path = f"{save_folder}/{exp_name}-legend.pdf"
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, bbox_inches='tight')
-        logging.info(f"Saved to {save_path}")
-        
-        plt.close(fig)
-        plt.close(fig_leg)
-        
-        
-        # # Plot and save the TPR vs. Avg Det Time
-        # fig, ax = plot_metrics(
-        #     df,
-        #     method_to_color,
-        #     exp_name,
-        #     x_name="avg_det_time",
-        #     y_name="tpr",
-        # )
+                for eval_protocol in ['classify_cp_functional', 'classify_cp_maxsofar']:
+                    key = f"{eval_protocol}/{original_method_name}"
+                    if key not in data_run:
+                        print(f"Key {key} not found in run {run_path}")
+                        continue
+                    df = data_run[key].copy()
+                    df['method_name'] = method_name
+                    df['method_name_full'] = original_method_name
+                    df['eval_protocol'] = eval_protocol
+                    df['subset'] = row['subset']
+                    dfs_cp.append(df)
 
-        # # Plot a vertical line at gt_avg_fail_time
-        # plt.axvline(x=gt_avg_fail_time, color='blue', linestyle='--', label="GT Avg Fail Time")
-        
-        # plt.xlim(0, 0.7)
-        # ax.set_ylim(bottom=0.45)
-        
-        # save_path = f"{save_folder}/{exp_name}-tpr_tdet.pdf"
-        # os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        # plt.savefig(save_path, bbox_inches='tight')
-        # logging.info(f"Saved to {save_path}")
-        
-        # plt.close(fig)
-        
-        
-        # Plot other metrics vs. alpha
-        for metric_key in ['fpr', "fnr", "tpr", "tnr", "bal_acc"]:
+            df_cp = pd.concat(dfs_cp, ignore_index=True)
+
+            if exp_name == "pi0_libero_v3":
+                df_cp['calib on'] = df_cp['calib on'].fillna("neg")
+
+            group_by_cols = [
+                'detect_method', 'cal split', 'test split', 'calib on', 'task',
+                'thresh_method', 'alpha', 'time', 'method_name', 'method_name_full','eval_protocol',
+            ]
+            mean_value_cols = [
+                'tpr', 'tnr', 'fpr', 'fnr', 'acc', 'bal_acc', 'f1', 'weighted-acc',
+                'roc_auc', 'prc_auc', 'threshold', 'avg_det_time',
+            ]
+            df_cp = df_cp.groupby(group_by_cols)[mean_value_cols].agg(['mean']).reset_index()
+            df_cp.columns = df_cp.columns.droplevel(1)
+
+            print(f"Loaded {len(df_cp)} rows from {len(dfs_cp)} runs")
+
+            # Check the values for the following keys
+            keys = [
+                'cal split',
+                'test split',
+                'calib on',
+                'task',
+                'thresh_method',
+                'time',
+                'method_name',
+                "subset",
+            ]
+
+            for k in keys:
+                if k in df_cp.columns:
+                    for v in df_cp[k].unique():
+                        n = len(df_cp[df_cp[k] == v])
+                        # print(f"{k}: {v} -> {n}")
+                        logging.debug(f"{k}: {v} -> {n}")
+
+            # Filter the metrics based on argument
+            df = df_cp.copy()
+            if args.eval_proto == "functional":
+                df = df[df['time'] == 'by final end']
+                df = df[df['calib on'] == 'neg']
+                df = df[df['thresh_method'] == 'functional CP']
+            elif args.eval_proto == "max_neg":
+                df = df[df['time'] == 'by final end']
+                df = df[df['calib on'] == 'neg']
+                df = df[df['thresh_method'] == 'split CP, cal on val_seen']
+            elif args.eval_proto == "max_pos":
+                df = df[df['time'] == 'by final end']
+                df = df[df['calib on'] == 'pos']
+                df = df[df['thresh_method'] == 'split CP, cal on val_seen']
+            else:
+                raise ValueError(f"Unknown eval_proto: {args.eval_proto}")
+
+            if args.alphas:
+                df = df[df['alpha'].isin(args.alphas)]
+
+            print(f"number of rows: {len(df)}")
+
+            method_to_color = get_method_colors(METHOD_NAME_2_GROUP_ID)
+
+
+            # Plot and save the Bal Acc vs. Avg Det Time
             fig, ax = plot_metrics(
                 df,
                 method_to_color,
                 exp_name,
-                x_name="alpha",
-                y_name=metric_key,
+                x_name="avg_det_time",
+                y_name="bal_acc",
             )
 
-            if args.eval_proto in ['functional', 'max_neg']: # use negative for CP
-                if metric_key in ['tnr']:
-                    plt.plot([0, 1], [1, 0], color="gray", linestyle="--")
-                    # plt.xlim(0, 0.5)
-                    # plt.ylim(0.5, 1)
-                elif metric_key in ['fpr']:
-                    plt.plot([0, 1], [0, 1], color="gray", linestyle="--")
-                    # plt.xlim(0, 0.5)
-                    # plt.ylim(0, 0.5)
-            elif args.eval_proto == 'max_pos':
-                if metric_key in ['tpr']:
-                    plt.plot([0, 1], [1, 0], color="gray", linestyle="--")
-                    # plt.xlim(0, 0.5)
-                    # plt.ylim(0.5, 1)
-                elif metric_key in ['fnr']:
-                    plt.plot([0, 1], [0, 1], color="gray", linestyle="--")
-                    # plt.xlim(0, 0.5)
-                    # plt.ylim(0, 0.5)
-                    
-            # if metric_key != "bal_acc":
-            #     ax.set_aspect('equal', adjustable='box')
-            plt.xlim(0, 0.5)
-            plt.tight_layout()
-            
-            save_path = f"{save_folder}/{exp_name}-{metric_key}.pdf"
+            # Plot a vertical line at gt_avg_fail_time
+            plt.axvline(x=gt_avg_fail_time, color='blue', linestyle='--', label="GT Avg Fail Time")
+
+            plt.xlim(0, 0.7)
+            ax.set_ylim(bottom=0.45)
+
+            save_folder = f"notebooks/figures/{args.version}/{args.eval_proto}_combined_cp/"
+            print(f"Plots will be saved to: {os.path.abspath(save_folder)}")
+
+            # Save top-k alphas (sorted by bal_acc, descending, ties included) per task/seed
+            save_topk_bal_acc_alphas(
+                df, "lstm", args.topk_k,
+                f"{save_folder}/rl2_cp_alphas_combined.json",
+            )
+
+            save_path = f"{save_folder}/{exp_name}-balacc_tdet.pdf"
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             plt.savefig(save_path, bbox_inches='tight')
             logging.info(f"Saved to {save_path}")
-            
+
+            # Plot and save the legend figure
+            fig_leg = plot_legend(ax)
+
+            save_path = f"{save_folder}/{exp_name}-legend.pdf"
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, bbox_inches='tight')
+            logging.info(f"Saved to {save_path}")
+
             plt.close(fig)
+            plt.close(fig_leg)
+
+
+            # # Plot and save the TPR vs. Avg Det Time
+            # fig, ax = plot_metrics(
+            #     df,
+            #     method_to_color,
+            #     exp_name,
+            #     x_name="avg_det_time",
+            #     y_name="tpr",
+            # )
+
+            # # Plot a vertical line at gt_avg_fail_time
+            # plt.axvline(x=gt_avg_fail_time, color='blue', linestyle='--', label="GT Avg Fail Time")
+
+            # plt.xlim(0, 0.7)
+            # ax.set_ylim(bottom=0.45)
+
+            # save_path = f"{save_folder}/{exp_name}-tpr_tdet.pdf"
+            # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            # plt.savefig(save_path, bbox_inches='tight')
+            # logging.info(f"Saved to {save_path}")
+
+            # plt.close(fig)
+
+
+            # Plot other metrics vs. alpha
+            for metric_key in ['fpr', "fnr", "tpr", "tnr", "bal_acc"]:
+                fig, ax = plot_metrics(
+                    df,
+                    method_to_color,
+                    exp_name,
+                    x_name="alpha",
+                    y_name=metric_key,
+                )
+
+                if args.eval_proto in ['functional', 'max_neg']: # use negative for CP
+                    if metric_key in ['tnr']:
+                        plt.plot([0, 1], [1, 0], color="gray", linestyle="--")
+                        # plt.xlim(0, 0.5)
+                        # plt.ylim(0.5, 1)
+                    elif metric_key in ['fpr']:
+                        plt.plot([0, 1], [0, 1], color="gray", linestyle="--")
+                        # plt.xlim(0, 0.5)
+                        # plt.ylim(0, 0.5)
+                elif args.eval_proto == 'max_pos':
+                    if metric_key in ['tpr']:
+                        plt.plot([0, 1], [1, 0], color="gray", linestyle="--")
+                        # plt.xlim(0, 0.5)
+                        # plt.ylim(0.5, 1)
+                    elif metric_key in ['fnr']:
+                        plt.plot([0, 1], [0, 1], color="gray", linestyle="--")
+                        # plt.xlim(0, 0.5)
+                        # plt.ylim(0, 0.5)
+
+                # if metric_key != "bal_acc":
+                #     ax.set_aspect('equal', adjustable='box')
+                plt.xlim(0, 0.5)
+                plt.tight_layout()
+
+                save_path = f"{save_folder}/{exp_name}-{metric_key}.pdf"
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                plt.savefig(save_path, bbox_inches='tight')
+                logging.info(f"Saved to {save_path}")
+
+                plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -505,5 +750,8 @@ if __name__ == "__main__":
     parser.add_argument("--version", type=str, default="v2", help="Version of the data to use")
     parser.add_argument("--use_seed", type=int, default=0, help="Seed to use for the data")
     parser.add_argument("--eval_proto", type=str, default="functional", help="Evaluation protocol to use")
+    parser.add_argument("--per_task_or_seed", action="store_true", default=True, help="Generate per-task subplot figures instead of combined figures")
+    parser.add_argument("--alphas", type=float, nargs="*", default=[0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50], help="Subset of alpha values to display (e.g. 0.05 0.10 0.20). Empty = show all.")
+    parser.add_argument("--topk_k", type=int, default=3, help="Number of top alphas (by bal_acc, descending) to keep per task/seed in the top-k JSON output. Ties beyond k are also included.")
     args = parser.parse_args()
     main(args)

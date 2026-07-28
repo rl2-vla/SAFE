@@ -88,12 +88,23 @@ def eval_metrics_and_log(
         )
         to_be_logged.update(metrics_logs)
         
-        #### Evaluate the classification performance using different thresholding methods ####
-        # Split Conformal Prediction: val_seen for calibration, val_unseen for testing
-        # Here we only use val_seen for calibration, to make it comparable to learned methods
+        #### Dataset splits ####
+        if "val_seen" in rollouts_by_split_name and "val_unseen" in rollouts_by_split_name:
+            calib_splits = ["val_seen"]
+            test_splits = ["val_unseen"]
+        elif "val_seen" in rollouts_by_split_name:
+            # No val splits - use train for both calibration and testing
+            calib_splits = ["val_seen"]
+            test_splits = ["val_seen"]
+        else:
+            # Fallback to any available split
+            available_split = list(rollouts_by_split_name.keys())[0]
+            calib_splits = [available_split]
+            test_splits = [available_split]
+
         split_cp_logs = eval_split_conformal(
             rollouts_by_split_name, scores_by_split_name, metric_name,
-            calib_split_names=["val_seen"], test_split_names=["val_unseen"]
+            calib_split_names=calib_splits, test_split_names=test_splits
         )
         split_cp_logs = pd.DataFrame(split_cp_logs)
         to_be_logged[f"classify_cp_maxsofar/{metric_name}"] = wandb.Table(dataframe=split_cp_logs)
@@ -101,7 +112,7 @@ def eval_metrics_and_log(
         # Functional Conformal Prediction
         df, cp_bands_by_alpha = eval_functional_conformal(
             rollouts_by_split_name, scores_by_split_name, metric_name,
-            calib_split_names=["val_seen"], test_split_names=["val_unseen"]
+            calib_split_names=calib_splits, test_split_names=test_splits
         )
         to_be_logged[f"classify_cp_functional/{metric_name}"] = wandb.Table(dataframe=df)
         
@@ -165,10 +176,23 @@ def eval_model_and_log(
         )
         to_be_logged[f"classify_fixed_thresh/{method_name}"] = wandb.Table(dataframe=df)
 
-        # Split Conformal Prediction: val_seen for calibration, val_unseen for testing
+        #### Dataset splits ####
+        if "val_seen" in rollouts_by_split_name and "val_unseen" in rollouts_by_split_name:
+            calib_splits = ["val_seen"]
+            test_splits = ["val_unseen"]
+        elif "val_seen" in rollouts_by_split_name:
+            # No val splits - use train for both calibration and testing
+            calib_splits = ["val_seen"]
+            test_splits = ["val_seen"]
+        else:
+            # Fallback to any available split
+            available_split = list(rollouts_by_split_name.keys())[0]
+            calib_splits = [available_split]
+            test_splits = [available_split]
+
         split_cp_logs = eval_split_conformal(
             rollouts_by_split_name, scores_by_split_name, method_name,
-            calib_split_names=["val_seen"], test_split_names=["val_unseen"]
+            calib_split_names=calib_splits, test_split_names=test_splits
         )
         split_cp_logs = pd.DataFrame(split_cp_logs)
         to_be_logged[f"classify_cp_maxsofar/{method_name}"] = wandb.Table(dataframe=split_cp_logs)
@@ -176,7 +200,7 @@ def eval_model_and_log(
         # Functional Conformal Prediction
         df, cp_bands_by_alpha = eval_functional_conformal(
             rollouts_by_split_name, scores_by_split_name, method_name,
-            calib_split_names=["val_seen"], test_split_names=["val_unseen"]
+            calib_split_names=calib_splits, test_split_names=test_splits
         )
         to_be_logged[f"classify_cp_functional/{method_name}"] = wandb.Table(dataframe=df)
         

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 from omegaconf import MISSING, OmegaConf
 import hydra
@@ -61,7 +61,7 @@ class OpenvlaDatasetConfig(DatasetConfig):
 class OpenPizeroDatasetConfig(DatasetConfig):
     name: str = "open_pizero"
     unseen_task_ratio: float = 0.25
-    seen_train_ratio: float = 0.66
+    seen_train_ratio: float = 0.6
     pred_horizon: int = 4
     exec_horizon: int = 2
 
@@ -249,8 +249,8 @@ class TrainConfig:
     log_precomputed: bool = False
     log_precomputed_only: bool = False
     seed: str | int = "0"
-    wandb_project: str = "vla-safe"
-    wandb_dir: str = "./wandb"
+    wandb_project: str = "rl2-vla-safe"
+    wandb_dir: str = "./"
     wandb_group_name: str = "debug"
     exp_suffix: str = "debug"
     exp_name: str = MISSING
@@ -261,13 +261,16 @@ class TrainConfig:
     
     eval_save_video: bool = False
     eval_save_video_functional: bool = False
-    eval_save_video_multiproc: bool = True
+    eval_save_video_multiproc: bool = False
+    skip_video_gen_during_eval: bool = False
     eval_save_timing_plots: bool = False
     eval_save_logs: bool = False
     eval_save_ckpt: bool = False
     logs_save_root: str = "./logs/"
     logs_save_path: str = MISSING
     eval_cp_alpha: float = 0.2
+    combine_cp_band: bool = True       # If false, generate per-task cp bands
+    combine_seed_cp_band: bool = True  # If false, generate per-(task, seed) cp bands
     
     
 
@@ -281,8 +284,7 @@ class Config:
     # These fields are required and will be provided by Hydra’s config groups.
     dataset: DatasetConfig = MISSING
     model: ModelConfig = MISSING
-    train: TrainConfig = TrainConfig()
-
+    train: TrainConfig = field(default_factory=TrainConfig)
 #########################
 # Register with ConfigStore
 #########################

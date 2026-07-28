@@ -1,3 +1,74 @@
+# Adapted SAFE for [RL2-VLA](https://github.com/rl2-vla/RL2-VLA)
+
+<b>Note:</b> This fork adapts the SAFE repository to Pi0 used in RL2-VLA. It trains a multi-task failure detector and calibrates per-task/combined conformal prediction (CP) bands across all 4 SimplerEnv tasks. Please refer to the official [SAFE repository](https://github.com/vla-safe/SAFE) for the original implementation.
+
+## Training SAFE on CoVer Pi0 rollouts
+Running this involves five steps:
+
+1. **Collect VLA rollouts** for all 4 SimplerEnv tasks using pi0 following instructions from the [RL2-VLA repository](https://github.com/rl2-vla/RL2-VLA). You must organize and rename the rollout folders based on the correct [directory structure](#rollouts-folder-structure), and specify the rollout path in the [training config file](failure_prob/conf/dataset/open_pizero_simpler_bridge.yaml) (`open_pizero_simpler_bridge.yaml`).
+
+2. **Sweep SAFE hyperparameters** - concurrent runs are highly recommended. Training logs and artifacts are saved to wandb.
+   ```bash
+   # Single instance
+   bash scripts/batch_training/submit_opi0_simpler.bash
+
+   # Concurrent runs
+   bash scripts/batch_training/opi0_simpler_parallel_runs/submit_opi0_simpler_[0-3].bash
+   ```
+
+3. **Determine the best hyperparameters** by sorting the wandb runs (from step 2) based on the ROC-AUC metric. See [example output CSV](scripts/wandb_metrics_batch_v2/SAVED/example_opi0_simpler/opi0_simpler_v1.csv).
+   ```bash
+   python scripts/get_wandb_metrics.py
+   ```
+
+4. **Train with the optimal hyperparameters** to output the final SAFE checkpoint and to calibrate CP bands. See examples: [per-task and combined](scripts/batch_training/logs/SAVED/).
+   ```bash
+   # Train SAFE ckpt and calibrate CP bands
+   bash scripts/batch_training/train_optimal_opi0_simpler.bash
+
+   # Visualize CP bands
+   python scripts/batch_training/visualize_cp_band.py
+
+   # Rerun for optimal hyperparams training run (note: change WANBD_PROJECT_NAME)
+   python scripts/get_wandb_metrics.py  
+   ```
+
+5. **Generate balanced-accuracy plots** using the CSV and wandb artifacts from steps 3-4 to identify the top-k alpha hyperparameters. See [example plots and json](scripts/notebooks/figures/example_plots_opi0_simpler/opi0_cp_plots_per_task_per_seed_safe_s0/opi0_simpler_v1-per_task-bal_acc_seed0.pdf).
+   ```bash
+   python scripts/eval_conformal_figure.py
+   ```
+
+## Rollouts Folder Structure
+
+Rollouts must be organized by task, then by seed, with each episode's `.mp4`, `.pkl`, and `_meta.json` files inside the corresponding seed folder. Please follow the structure and naming convention as follows:
+
+```bash
+rl2_vla_collected_rollouts/
+├── widowx_carrot_on_plate/
+│   ├── widowx_carrot_on_plate_seed0/
+│   ├── widowx_carrot_on_plate_seed7/
+│   └── widowx_carrot_on_plate_seed42/
+├── widowx_put_eggplant_in_basket/
+├── widowx_spoon_on_towel/
+└── widowx_stack_cube/
+    ├── widowx_stack_cube_seed0/
+    ├── widowx_stack_cube_seed7/
+    └── widowx_stack_cube_seed42/
+        ├── episode_1_success_False_meta.json
+        ├── episode_1_success_False.mp4
+        ├── episode_1_success_False.pkl
+        ├── episode_2_success_False_meta.json
+        ├── episode_2_success_False.mp4
+        ├── episode_2_success_False.pkl
+        └── ...
+```
+
+___
+
+<br>
+
+
+
 # SAFE: Multitask Failure Detection for Vision-Language-Action Models
 
 **Neural Information Processing Systems (NeurIPS) 2025**
@@ -60,7 +131,11 @@ wandb login
 # cd to the root directory of this repo
 pip install -e .
 ```
-
+# H100 Specifics
+```bash
+sudo apt install -y libgl1
+sudo apt install -y libglib2.0-0
+```
 ### Training and evaluation 
 
 Please see the following file for training and evaluation scripts for SAFE failure detector and all baselines. 
@@ -83,7 +158,8 @@ Other useful scripts are as follows:
 
 ```bash
 # To generate plots as shown in Figure 1 and Figure 7
-python scripts/visualize_features.py
+python scripts/visualize_features.py 
+python scripts/visualize_features.py dataset=openvla_simpler_bridge projector=tsne
 
 # To generate plots as shown in Figure 8
 python scripts/eval_conformal_figure.py
