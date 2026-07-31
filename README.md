@@ -1,11 +1,11 @@
-# Adapted SAFE for [RL2-VLA](https://github.com/rl2-vla/RL2-VLA)
+# Adapted SAFE for [RL2-VLA](https://github.com/marmotlab/RL2-VLA)
 
 <b>Note:</b> This fork adapts the SAFE repository to Pi0 used in RL2-VLA. It trains a multi-task failure detector and calibrates per-task/combined conformal prediction (CP) bands across all 4 SimplerEnv tasks. Please refer to the official [SAFE repository](https://github.com/vla-safe/SAFE) for the original implementation.
 
 ## Training SAFE on CoVer Pi0 rollouts
 Running this involves five steps:
 
-1. **Collect VLA rollouts** for all 4 SimplerEnv tasks using pi0 following instructions from the [RL2-VLA repository](https://github.com/rl2-vla/RL2-VLA). You must organize and rename the rollout folders based on the correct [directory structure](#rollouts-folder-structure), and specify the rollout path in the [training config file](failure_prob/conf/dataset/open_pizero_simpler_bridge.yaml) (`open_pizero_simpler_bridge.yaml`).
+1. **Collect VLA rollouts** for all 4 SimplerEnv tasks using pi0 following instructions from the [RL2-VLA repository](https://github.com/marmotlab/RL2-VLA). You must organize and rename the rollout folders based on the correct [directory structure](#rollouts-folder-structure), and specify the rollout path in the [training config file](failure_prob/conf/dataset/open_pizero_simpler_bridge.yaml) (`open_pizero_simpler_bridge.yaml`).
 
 2. **Sweep SAFE hyperparameters** - concurrent runs are highly recommended. Training logs and artifacts are saved to wandb.
    ```bash
@@ -33,7 +33,7 @@ Running this involves five steps:
    python scripts/get_wandb_metrics.py  
    ```
 
-5. **Generate balanced-accuracy plots** using the CSV and wandb artifacts from steps 3-4 to identify the top-k alpha hyperparameters. See [example plots and json](scripts/notebooks/figures/example_plots_opi0_simpler/opi0_cp_plots_per_task_per_seed_safe_s0/opi0_simpler_v1-per_task-bal_acc_seed0.pdf).
+5. **Generate balanced-accuracy plots** using the CSV and wandb artifacts from steps 3-4 to identify the top-k alpha hyperparameters. See [example plots and json](notebooks/figures/example_plots_opi0_simpler/opi0_cp_plots_per_task_per_seed_safe_s0/opi0_simpler_v1-per_task-bal_acc_seed0.pdf).
    ```bash
    python scripts/eval_conformal_figure.py
    ```
