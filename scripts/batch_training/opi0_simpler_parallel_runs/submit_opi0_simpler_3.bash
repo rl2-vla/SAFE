@@ -19,7 +19,7 @@ for DATASET in open_pizero_simpler_bridge; do
         model.lambda_reg=1e-3,1e-2,1e-1,1 \
         train.seed=0-1-2 \
         train.combine_cp_band=False \
-        train.combine_seed_cp_band=False \
+        train.combine_seed_cp_band=True \
         dataset.unseen_task_ratio=0.0 \
         model.n_epochs=1000,2000 \
         train.wandb_project=rl2-vla-safe-sweep \

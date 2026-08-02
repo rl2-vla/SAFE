@@ -20,7 +20,7 @@ for DATASET in open_pizero_simpler_bridge; do
         model.lr=0.001 \
         model.lambda_reg=0.1 \
         train.combine_cp_band=False \
-        train.combine_seed_cp_band=False \
+        train.combine_seed_cp_band=True \
         train.seed=0 \
         train.eval_save_video_functional=True \
         train.eval_save_video_multiproc=True \
@@ -46,7 +46,7 @@ for DATASET in open_pizero_simpler_bridge; do
         model.lr=0.001 \
         model.lambda_reg=0.1 \
         train.combine_cp_band=True \
-        train.combine_seed_cp_band=False \
+        train.combine_seed_cp_band=True \
         train.seed=0 \
         train.eval_save_video_functional=True \
         train.eval_save_video_multiproc=True \

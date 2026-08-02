@@ -14,7 +14,7 @@ from failure_prob.utils.wandb import (
 WANDB_ENTITY = wandb.Api().default_entity
 WANBD_PROJECT_NAME = f"{WANDB_ENTITY}/rl2-vla-safe-sweep"
 # WANDB_USERNAME = wandb.Api().viewer.username
-# WANBD_PROJECT_NAME = f"{WANDB_USERNAME}/rl2-vla-safe-per-task-optimal"
+# WANBD_PROJECT_NAME = f"{WANDB_USERNAME}/rl2-vla-safe-per-task-heuristic"
 
 
 

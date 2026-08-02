@@ -23,18 +23,22 @@ Running this involves five steps:
 
 4. **Train with the optimal hyperparameters** to output the final SAFE checkpoint and to calibrate CP bands. See examples: [per-task and combined](scripts/batch_training/logs/SAVED/).
    ```bash
-   # Train SAFE ckpt and calibrate CP bands
+   # Train SAFE ckpt and calibrate CP bands with optimal hyperparams
    bash scripts/batch_training/train_optimal_opi0_simpler.bash
 
    # Visualize CP bands
    python scripts/batch_training/visualize_cp_band.py
-
-   # Rerun for optimal hyperparams training run (note: change WANBD_PROJECT_NAME)
-   python scripts/get_wandb_metrics.py  
    ```
 
 5. **Generate balanced-accuracy plots** using the CSV and wandb artifacts from steps 3-4 to identify the top-k alpha hyperparameters. See [example plots and json](notebooks/figures/example_plots_opi0_simpler/opi0_cp_plots_per_task_per_seed_safe_s0/opi0_simpler_v1-per_task-bal_acc_seed0.pdf).
    ```bash
+   # Rerun with optimal hyperparams for per-seed top-k heuristic 
+   bash scripts/batch_training/alpha_heuristic_opi0_simpler.bash
+
+   # Note: change WANBD_PROJECT_NAME, and ensure only 1 run in wandb project
+   python scripts/get_wandb_metrics.py
+
+   # Generate bal-acc plots
    python scripts/eval_conformal_figure.py
    ```
 
