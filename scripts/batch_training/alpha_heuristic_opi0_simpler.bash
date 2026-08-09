@@ -51,7 +51,7 @@ for DATASET in open_pizero_simpler_bridge; do
         train.seed=0 \
         train.eval_save_video_functional=True \
         train.eval_save_video_multiproc=True \
-        train.eval_save_ckpt=True \
+        train.eval_save_ckpt=False \
         model.n_epochs=2000 \
         train.skip_video_gen_during_eval=True \
         train.wandb_project=rl2-vla-safe-combined-heuristic \
