@@ -262,6 +262,7 @@ def main(args: argparse.Namespace):
     for benchmark_name in benchmark_names:
         benchmark = WANDB_META[benchmark_name]
         print(f"Processing {benchmark_name}...")
+        print("Note: will take a longer time for wandb projects with many runs (e.g. hyperparameter sweep)")
         benchmark_best = []
         for group in benchmark:
             project_name = group["project_name"]

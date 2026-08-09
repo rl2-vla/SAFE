@@ -7,7 +7,7 @@ Running this involves five steps:
 
 1. **Collect VLA rollouts** for all 4 SimplerEnv tasks using pi0 following instructions from the [RL2-VLA repository](https://github.com/marmotlab/RL2-VLA). You must organize and rename the rollout folders based on the correct [directory structure](#rollouts-folder-structure), and specify the rollout path in the [training config file](failure_prob/conf/dataset/open_pizero_simpler_bridge.yaml) (`open_pizero_simpler_bridge.yaml`).
 
-2. **Sweep SAFE hyperparameters** - concurrent runs are highly recommended. Training logs and artifacts are saved to wandb.
+2. **Sweep SAFE hyperparameters** - concurrent runs are highly recommended. Training logs and artifacts are saved to wandb. Please consider changing `train.wandb_dir` as this sweep takes up significant storage.
    ```bash
    # Single instance
    bash scripts/batch_training/submit_opi0_simpler.bash

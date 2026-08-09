@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Run all experiments on SimplerEnv rollouts
+# NOTE: change train.wandb_dir as this sweep takes up significant storage
 
 GROUP_NAME=opi0_simpler_v1
 
@@ -23,6 +24,7 @@ for DATASET in open_pizero_simpler_bridge; do
         dataset.unseen_task_ratio=0.0 \
         model.n_epochs=1000,2000 \
         train.wandb_project=rl2-vla-safe-sweep \
+        train.wandb_dir=./ \
         train.exp_suffix=lstm \
         train.skip_video_gen_during_eval=True
 done
