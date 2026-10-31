@@ -4,9 +4,11 @@
 # NOTE: change train.wandb_dir as this sweep takes up significant storage
 
 GROUP_NAME=opi0_simpler_v1
+DATASETS=open_pizero_simpler_bridge
+# DATASETS=open_pizero_simpler_fractal
 
 # LSTM 
-for DATASET in open_pizero_simpler_bridge; do
+for DATASET in ${DATASETS}; do
     python -m failure_prob.train \
         --multirun \
         train.wandb_group_name=${GROUP_NAME} \

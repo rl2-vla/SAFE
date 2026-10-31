@@ -81,10 +81,16 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
         "widowx_put_eggplant_in_basket",
         "widowx_spoon_on_towel",
         "widowx_stack_cube",
-        "google_robot_move_near_v0",
-        "google_robot_open_drawer",
-        "google_robot_close_drawer",
-        "google_robot_place_apple_in_closed_top_drawer",
+        "simpler_google_coke_horizontal",
+        "simpler_google_coke_vertical",
+        "simpler_google_coke_standing",
+        "simpler_google_open_top_drawer",
+        "simpler_google_open_middle_drawer",
+        "simpler_google_open_bottom_drawer",
+        "simpler_google_close_top_drawer",
+        "simpler_google_close_middle_drawer",
+        "simpler_google_close_bottom_drawer",
+        "simpler_google_apple_in_drawer",
     ]
 
     # Match task names with any postfix (e.g., widowx_put_eggplant_in_basket_seed0)
