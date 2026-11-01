@@ -81,14 +81,14 @@ done
 #         model.lambda_reg=0.1 \
 #         train.combine_cp_band=False \
 #         train.combine_seed_cp_band=True \
-#         train.seed=0 \
+#         train.seed=1 \
 #         train.eval_save_video_functional=True \
 #         train.eval_save_video_multiproc=True \
 #         train.eval_save_ckpt=True \
 #         model.n_epochs=2000 \
 #         train.skip_video_gen_during_eval=True \
-#         train.wandb_project=rl2-vla-safe-per-task-optimal \
-#         train.exp_suffix=lstm
+#         train.wandb_project=rl2-vla-safe-per-task-optimal-google-4tasks-v1 \
+#         train.exp_suffix=lstm   
 # done
 
 # # LSTM - Combined Task (for OOD tasks)
@@ -107,12 +107,12 @@ done
 #         model.lambda_reg=0.1 \
 #         train.combine_cp_band=True \
 #         train.combine_seed_cp_band=True \
-#         train.seed=0 \
+#         train.seed=1 \
 #         train.eval_save_video_functional=True \
 #         train.eval_save_video_multiproc=True \
 #         train.eval_save_ckpt=True \
 #         model.n_epochs=2000 \
 #         train.skip_video_gen_during_eval=True \
-#         train.wandb_project=rl2-vla-safe-combined-optimal \
-#         train.exp_suffix=lstm
+#         train.wandb_project=rl2-vla-safe-combined-optimal-google-4tasks-v1 \
+#         train.exp_suffix=lstm   
 # done

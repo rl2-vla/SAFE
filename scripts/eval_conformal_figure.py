@@ -105,9 +105,9 @@ def read_aggregated_training_results_v2(
     
     subsets = ['default']
     if "simpler" in os.path.basename(csv_path):
-        # subsets = ['bridge', 'fractal']
-        subsets = ['bridge']
-        
+        # Infer subsets (e.g. 'bridge' for WidowX, 'fractal' for Google robot) from columns like "0-fractal-_entity"
+        subsets = sorted({c.split("-")[1] for c in df_best.columns if re.fullmatch(r"\d+-[^-]+-_entity", c)})
+
     n_seeds = 3
     if "droid" in os.path.basename(csv_path):
         n_seeds = 5

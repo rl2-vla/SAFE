@@ -3,7 +3,7 @@ defaults:
   
 subset_name: "fractal"
 data_path_prefix: ""
-data_path: "/home/coder/hdd/SAFE_ds/rollouts/20261031_google_safe_rollouts_zero_action_on_success_3tasks"
+data_path: "/home/coder/hdd/SAFE_ds/rollouts/20261031_google_safe_rollouts_zero_action_on_success_4tasks"
 
 pred_horizon: 4
 exec_horizon: 2

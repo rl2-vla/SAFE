@@ -91,6 +91,7 @@ def load_rollouts(cfg: Config) -> list[Rollout]:
         "simpler_google_close_middle_drawer",
         "simpler_google_close_bottom_drawer",
         "simpler_google_apple_in_drawer",
+        "simpler_google_apple_in_open_drawer",
     ]
 
     # Match task names with any postfix (e.g., widowx_put_eggplant_in_basket_seed0)

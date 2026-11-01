@@ -36,7 +36,7 @@ Running this involves five steps:
    bash scripts/batch_training/alpha_heuristic_opi0_simpler.bash
 
    # Note: change WANBD_PROJECT_NAME, and ensure only 1 run in wandb project
-   python scripts/get_wandb_metrics.py
+   python scripts/get_wandb_metrics.py --top-n 1
 
    # Generate bal-acc plots
    python scripts/eval_conformal_figure.py

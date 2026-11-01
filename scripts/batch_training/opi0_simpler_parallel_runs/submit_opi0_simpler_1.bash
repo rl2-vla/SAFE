@@ -25,7 +25,7 @@ for DATASET in ${DATASETS}; do
         train.combine_seed_cp_band=True \
         dataset.unseen_task_ratio=0.0 \
         model.n_epochs=1000,2000 \
-        train.wandb_project=rl2-vla-safe-sweep \
+        train.wandb_project=rl2-vla-safe-sweep-google-4tasks-v1 \
         train.wandb_dir=./ \
         train.exp_suffix=lstm \
         train.skip_video_gen_during_eval=True
